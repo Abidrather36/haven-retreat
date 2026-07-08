@@ -1,0 +1,6 @@
+{
+  "name": "Haven Stay Portal",
+  "description": "An immersive boutique experience portal for Haven Retreat in Kashmir, featuring cinematic storytelling, digital local guide, cozy bookings registry, and an AI chat with the hosts by the hearth.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
