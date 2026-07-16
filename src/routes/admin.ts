@@ -114,13 +114,14 @@ router.post('/create', async (req, res) => {
     );
 
     const newId = insertResult.rows[0].Id;
-    const emailSent = await sendTempPasswordEmail(email, fullName, tempPassword);
+    
+    // Fire and forget email to prevent UI blocking
+    sendTempPasswordEmail(email, fullName, tempPassword);
 
     res.status(201).json({ 
       success: true, 
       message: `Admin created successfully.`,
-      user: { id: newId, fullName, email, role: adminRole, isTempPassword: true, isActive: true },
-      emailSent
+      user: { id: newId, fullName, email, role: adminRole, isTempPassword: true, isActive: true }
     });
   } catch (err) {
     console.error("Create Admin Error:", err);
@@ -261,7 +262,7 @@ router.post('/change-password', async (req, res) => {
     const newHash = await bcrypt.hash(newPassword, 10);
     await pool.query(`UPDATE "Admins" SET "PasswordHash" = $1, "IsTempPassword" = FALSE WHERE "Id" = $2`, [newHash, adminId]);
 
-    await sendPasswordChangedConfirmation(admin.Email, admin.FullName);
+    sendPasswordChangedConfirmation(admin.Email, admin.FullName);
     res.json({ success: true, message: 'Password changed successfully.' });
   } catch (err) {
     res.status(500).json({ success: false, error: 'Internal server error.' });
@@ -290,7 +291,7 @@ router.post('/force-change-password', async (req, res) => {
     const newHash = await bcrypt.hash(newPassword, 10);
     await pool.query(`UPDATE "Admins" SET "PasswordHash" = $1, "IsTempPassword" = FALSE WHERE "Id" = $2`, [newHash, adminId]);
 
-    await sendPasswordChangedConfirmation(admin.Email, admin.FullName);
+    sendPasswordChangedConfirmation(admin.Email, admin.FullName);
     res.json({ success: true, message: 'Password set.', user: { id: admin.Id, fullName: admin.FullName, email: admin.Email, isTempPassword: false }});
   } catch (err) {
     res.status(500).json({ success: false, error: 'Internal server error.' });
@@ -317,7 +318,7 @@ router.post('/forgot-password', async (req, res) => {
     await pool.query(`UPDATE "Admins" SET "ResetToken" = $1, "ResetTokenExpiry" = $2 WHERE "Id" = $3`, [resetToken, resetExpiry, admin.Id]);
 
     const appUrl = process.env.APP_URL || 'http://localhost:3000';
-    await sendPasswordResetEmail(admin.Email, admin.FullName, `${appUrl}/#reset-password?token=${resetToken}`);
+    sendPasswordResetEmail(admin.Email, admin.FullName, `${appUrl}/#reset-password?token=${resetToken}`);
 
     res.json({ success: true, message: 'Sent if exists.' });
   } catch (err) {
@@ -350,7 +351,7 @@ router.post('/reset-password', async (req, res) => {
     const newHash = await bcrypt.hash(newPassword, 10);
     await pool.query(`UPDATE "Admins" SET "PasswordHash" = $1, "IsTempPassword" = FALSE, "ResetToken" = NULL, "ResetTokenExpiry" = NULL WHERE "Id" = $2`, [newHash, admin.Id]);
 
-    await sendPasswordChangedConfirmation(admin.Email, admin.FullName);
+    sendPasswordChangedConfirmation(admin.Email, admin.FullName);
     res.json({ success: true, message: 'Password reset successfully.' });
   } catch (err) {
     res.status(500).json({ success: false, error: 'Internal server error.' });
