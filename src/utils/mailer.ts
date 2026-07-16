@@ -1,5 +1,10 @@
 import nodemailer from "nodemailer";
 import dotenv from "dotenv";
+import dns from "node:dns";
+
+// Render's free tier lacks outbound IPv6 routing, causing ENETUNREACH errors with Gmail.
+// This forces Node.js to use IPv4 for all network requests.
+dns.setDefaultResultOrder('ipv4first');
 
 dotenv.config({ path: '.env.local' });
 
