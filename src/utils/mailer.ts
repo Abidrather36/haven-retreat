@@ -2,25 +2,89 @@ import nodemailer from "nodemailer";
 import dotenv from "dotenv";
 import dns from "node:dns";
 
-// Render's free tier lacks outbound IPv6 routing, causing ENETUNREACH errors with Gmail.
-// This forces Node.js to use IPv4 for all network requests.
+// Force IPv4 to avoid ENETUNREACH on some hosts
 dns.setDefaultResultOrder('ipv4first');
 
 dotenv.config({ path: '.env.local' });
 
-let transporter: nodemailer.Transporter | null = null;
+// ─── Resend HTTP API (works on Render free tier) ───
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
+const RESEND_FROM = "Haven Stay Portal <onboarding@resend.dev>";
+
+// ─── Gmail SMTP fallback (works on local dev) ───
+let smtpTransporter: nodemailer.Transporter | null = null;
 
 if (process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD && process.env.GMAIL_USER !== "your_email@gmail.com") {
-  transporter = nodemailer.createTransport({
+  smtpTransporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
       user: process.env.GMAIL_USER,
       pass: process.env.GMAIL_APP_PASSWORD,
     },
   });
-  console.log("[Mailer] Gmail SMTP transporter initialized.");
+}
+
+if (RESEND_API_KEY) {
+  console.log("[Mailer] ✅ Resend HTTP email API initialized (works on all hosts).");
+} else if (smtpTransporter) {
+  console.log("[Mailer] Gmail SMTP transporter initialized (local dev only).");
 } else {
-  console.warn("[Mailer] GMAIL_USER or GMAIL_APP_PASSWORD is missing or invalid. Emails will only be simulated.");
+  console.warn("[Mailer] No email provider configured. Emails will only be simulated.");
+}
+
+// ─── Core email sender with automatic fallback ───
+async function sendEmail(to: string, subject: string, html: string): Promise<boolean> {
+  // Priority 1: Resend HTTP API (works everywhere including Render free tier)
+  if (RESEND_API_KEY) {
+    try {
+      const response = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${RESEND_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          from: RESEND_FROM,
+          to: [to],
+          subject,
+          html,
+        }),
+      });
+
+      if (response.ok) {
+        console.log(`[Mailer] ✅ Email sent to ${to} via Resend`);
+        return true;
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        console.error(`[Mailer] ❌ Resend API error for ${to}:`, JSON.stringify(errorData));
+        return false;
+      }
+    } catch (err) {
+      console.error(`[Mailer] ❌ Resend network error for ${to}:`, err);
+      return false;
+    }
+  }
+
+  // Priority 2: Gmail SMTP (works on local dev, blocked on Render free tier)
+  if (smtpTransporter) {
+    try {
+      await smtpTransporter.sendMail({
+        from: `"Haven Stay Portal" <${process.env.GMAIL_USER}>`,
+        to,
+        subject,
+        html,
+      });
+      console.log(`[Mailer] ✅ Email sent to ${to} via Gmail SMTP`);
+      return true;
+    } catch (err) {
+      console.warn(`[Mailer] ⚠️ Gmail SMTP failed for ${to}. SMTP ports may be blocked.`);
+      return false;
+    }
+  }
+
+  // Priority 3: No provider available
+  console.warn(`[Mailer] ⚠️ No email provider available for ${to}.`);
+  return false;
 }
 
 // ─── Haven Stay branded email wrapper ───
@@ -86,35 +150,19 @@ export async function sendTempPasswordEmail(to: string, fullName: string, tempPa
     </p>
   `);
 
-  const logFallback = () => {
+  const sent = await sendEmail(to, '🔑 Your Haven Stay Portal Admin Credentials', htmlBody);
+
+  if (!sent) {
     console.log(`\n╔══════════════════════════════════════════════════╗`);
-    console.log(`║  📧 ADMIN CREDENTIALS (SMTP unavailable)         ║`);
+    console.log(`║  📧 ADMIN CREDENTIALS (email delivery failed)    ║`);
     console.log(`╠══════════════════════════════════════════════════╣`);
     console.log(`║  TO:        ${to}`);
     console.log(`║  NAME:      ${fullName}`);
     console.log(`║  PASSWORD:  ${tempPassword}`);
     console.log(`╚══════════════════════════════════════════════════╝\n`);
-  };
-
-  if (transporter) {
-    try {
-      await transporter.sendMail({
-        from: `"Haven Stay Portal" <${process.env.GMAIL_USER}>`,
-        to,
-        subject: '🔑 Your Haven Stay Portal Admin Credentials',
-        html: htmlBody
-      });
-      console.log(`[Mailer] ✅ Temporary password email sent to ${to}`);
-      return true;
-    } catch (err) {
-      console.warn(`[Mailer] ⚠️ SMTP failed for ${to}. Falling back to log output.`);
-      logFallback();
-      return true;
-    }
-  } else {
-    logFallback();
-    return true;
   }
+
+  return true;
 }
 
 // ─── Send Password Reset Email ───
@@ -153,35 +201,19 @@ export async function sendPasswordResetEmail(to: string, fullName: string, reset
     </p>
   `);
 
-  const logFallback = () => {
+  const sent = await sendEmail(to, '🔒 Password Reset — Haven Stay Portal', htmlBody);
+
+  if (!sent) {
     console.log(`\n╔══════════════════════════════════════════════════╗`);
-    console.log(`║  📧 PASSWORD RESET (SMTP unavailable)            ║`);
+    console.log(`║  📧 PASSWORD RESET (email delivery failed)       ║`);
     console.log(`╠══════════════════════════════════════════════════╣`);
     console.log(`║  TO:    ${to}`);
     console.log(`║  NAME:  ${fullName}`);
     console.log(`║  LINK:  ${resetLink}`);
     console.log(`╚══════════════════════════════════════════════════╝\n`);
-  };
-
-  if (transporter) {
-    try {
-      await transporter.sendMail({
-        from: `"Haven Stay Portal" <${process.env.GMAIL_USER}>`,
-        to,
-        subject: '🔒 Password Reset — Haven Stay Portal',
-        html: htmlBody
-      });
-      console.log(`[Mailer] ✅ Password reset email sent to ${to}`);
-      return true;
-    } catch (err) {
-      console.warn(`[Mailer] ⚠️ SMTP failed for ${to}. Falling back to log output.`);
-      logFallback();
-      return true;
-    }
-  } else {
-    logFallback();
-    return true;
   }
+
+  return true;
 }
 
 // ─── Send Password Changed Confirmation ───
@@ -210,35 +242,19 @@ export async function sendPasswordChangedConfirmation(to: string, fullName: stri
     </div>
   `);
 
-  const logFallback = () => {
+  const sent = await sendEmail(to, '✅ Password Changed — Haven Stay Portal', htmlBody);
+
+  if (!sent) {
     console.log(`\n╔══════════════════════════════════════════════════╗`);
-    console.log(`║  📧 PASSWORD CHANGED (SMTP unavailable)          ║`);
+    console.log(`║  📧 PASSWORD CHANGED (email delivery failed)     ║`);
     console.log(`╠══════════════════════════════════════════════════╣`);
     console.log(`║  TO:    ${to}`);
     console.log(`║  NAME:  ${fullName}`);
     console.log(`║  STATUS: Password changed successfully`);
     console.log(`╚══════════════════════════════════════════════════╝\n`);
-  };
-
-  if (transporter) {
-    try {
-      await transporter.sendMail({
-        from: `"Haven Stay Portal" <${process.env.GMAIL_USER}>`,
-        to,
-        subject: '✅ Password Changed — Haven Stay Portal',
-        html: htmlBody
-      });
-      console.log(`[Mailer] ✅ Password changed confirmation sent to ${to}`);
-      return true;
-    } catch (err) {
-      console.warn(`[Mailer] ⚠️ SMTP failed for ${to}. Falling back to log output.`);
-      logFallback();
-      return true;
-    }
-  } else {
-    logFallback();
-    return true;
   }
+
+  return true;
 }
 
-export { transporter };
+export { smtpTransporter as transporter };
