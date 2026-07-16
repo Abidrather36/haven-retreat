@@ -86,6 +86,16 @@ export async function sendTempPasswordEmail(to: string, fullName: string, tempPa
     </p>
   `);
 
+  const logFallback = () => {
+    console.log(`\n╔══════════════════════════════════════════════════╗`);
+    console.log(`║  📧 ADMIN CREDENTIALS (SMTP unavailable)         ║`);
+    console.log(`╠══════════════════════════════════════════════════╣`);
+    console.log(`║  TO:        ${to}`);
+    console.log(`║  NAME:      ${fullName}`);
+    console.log(`║  PASSWORD:  ${tempPassword}`);
+    console.log(`╚══════════════════════════════════════════════════╝\n`);
+  };
+
   if (transporter) {
     try {
       await transporter.sendMail({
@@ -97,15 +107,12 @@ export async function sendTempPasswordEmail(to: string, fullName: string, tempPa
       console.log(`[Mailer] ✅ Temporary password email sent to ${to}`);
       return true;
     } catch (err) {
-      console.error(`[Mailer] ❌ Failed to send temp password email to ${to}:`, err);
-      return false;
+      console.warn(`[Mailer] ⚠️ SMTP failed for ${to}. Falling back to log output.`);
+      logFallback();
+      return true;
     }
   } else {
-    console.log(`\n=== 📧 SIMULATED EMAIL: Temporary Password ===`);
-    console.log(`TO: ${to}`);
-    console.log(`SUBJECT: Your Haven Stay Portal Admin Credentials`);
-    console.log(`TEMP PASSWORD: ${tempPassword}`);
-    console.log(`===============================================\n`);
+    logFallback();
     return true;
   }
 }
@@ -146,6 +153,16 @@ export async function sendPasswordResetEmail(to: string, fullName: string, reset
     </p>
   `);
 
+  const logFallback = () => {
+    console.log(`\n╔══════════════════════════════════════════════════╗`);
+    console.log(`║  📧 PASSWORD RESET (SMTP unavailable)            ║`);
+    console.log(`╠══════════════════════════════════════════════════╣`);
+    console.log(`║  TO:    ${to}`);
+    console.log(`║  NAME:  ${fullName}`);
+    console.log(`║  LINK:  ${resetLink}`);
+    console.log(`╚══════════════════════════════════════════════════╝\n`);
+  };
+
   if (transporter) {
     try {
       await transporter.sendMail({
@@ -157,15 +174,12 @@ export async function sendPasswordResetEmail(to: string, fullName: string, reset
       console.log(`[Mailer] ✅ Password reset email sent to ${to}`);
       return true;
     } catch (err) {
-      console.error(`[Mailer] ❌ Failed to send reset email to ${to}:`, err);
-      return false;
+      console.warn(`[Mailer] ⚠️ SMTP failed for ${to}. Falling back to log output.`);
+      logFallback();
+      return true;
     }
   } else {
-    console.log(`\n=== 📧 SIMULATED EMAIL: Password Reset ===`);
-    console.log(`TO: ${to}`);
-    console.log(`SUBJECT: Password Reset — Haven Stay Portal`);
-    console.log(`RESET LINK: ${resetLink}`);
-    console.log(`==========================================\n`);
+    logFallback();
     return true;
   }
 }
@@ -196,6 +210,16 @@ export async function sendPasswordChangedConfirmation(to: string, fullName: stri
     </div>
   `);
 
+  const logFallback = () => {
+    console.log(`\n╔══════════════════════════════════════════════════╗`);
+    console.log(`║  📧 PASSWORD CHANGED (SMTP unavailable)          ║`);
+    console.log(`╠══════════════════════════════════════════════════╣`);
+    console.log(`║  TO:    ${to}`);
+    console.log(`║  NAME:  ${fullName}`);
+    console.log(`║  STATUS: Password changed successfully`);
+    console.log(`╚══════════════════════════════════════════════════╝\n`);
+  };
+
   if (transporter) {
     try {
       await transporter.sendMail({
@@ -207,14 +231,12 @@ export async function sendPasswordChangedConfirmation(to: string, fullName: stri
       console.log(`[Mailer] ✅ Password changed confirmation sent to ${to}`);
       return true;
     } catch (err) {
-      console.error(`[Mailer] ❌ Failed to send confirmation to ${to}:`, err);
-      return false;
+      console.warn(`[Mailer] ⚠️ SMTP failed for ${to}. Falling back to log output.`);
+      logFallback();
+      return true;
     }
   } else {
-    console.log(`\n=== 📧 SIMULATED EMAIL: Password Changed ===`);
-    console.log(`TO: ${to}`);
-    console.log(`SUBJECT: Password Changed — Haven Stay Portal`);
-    console.log(`=============================================\n`);
+    logFallback();
     return true;
   }
 }

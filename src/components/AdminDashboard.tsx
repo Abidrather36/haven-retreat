@@ -412,6 +412,11 @@ export default function AdminDashboard({
       });
       const data = await response.json();
       if (data.success) {
+        const tempPwd = data.tempPassword;
+        const msg = tempPwd 
+          ? `✅ Admin "${data.user.fullName}" created!\n\n🔑 Temporary Password:\n${tempPwd}\n\n⚠️ Copy this now! Share it with the admin so they can log in.`
+          : data.message;
+        window.alert(msg);
         setCreateAdminMessage(data.message);
         setNewAdminName('');
         setNewAdminEmail('');

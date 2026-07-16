@@ -121,7 +121,8 @@ router.post('/create', async (req, res) => {
     res.status(201).json({ 
       success: true, 
       message: `Admin created successfully.`,
-      user: { id: newId, fullName, email, role: adminRole, isTempPassword: true, isActive: true }
+      user: { id: newId, fullName, email, role: adminRole, isTempPassword: true, isActive: true },
+      tempPassword
     });
   } catch (err) {
     console.error("Create Admin Error:", err);
